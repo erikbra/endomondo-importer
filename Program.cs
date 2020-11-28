@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using endoimport;
+using endoimport.Logging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,10 +43,10 @@ namespace endomondo_importer
             bool tokenIsValid = false;
             
             // Get token from file if it exists, and check if it is still valid.
-            var configFile = Config.GetConfigFile("token.json");
-            if (File.Exists(configFile))
+            var tokenFile = Config.GetConfigFile("token.json");
+            if (File.Exists(tokenFile))
             {
-                var content = await File.ReadAllTextAsync(configFile);
+                var content = await File.ReadAllTextAsync(tokenFile);
                 token = JsonSerializer.Deserialize<OidcResponse>(content);
 
                 var now = DateTime.UtcNow;
@@ -60,7 +61,7 @@ namespace endomondo_importer
                 token = await client.Login(code);
 
                 var text = JsonSerializer.Serialize(token, new JsonSerializerOptions() { WriteIndented = true});
-                await File.WriteAllTextAsync(configFile, text);
+                await File.WriteAllTextAsync(tokenFile, text);
             }
             
             return token;
@@ -81,8 +82,14 @@ namespace endomondo_importer
         {
             var services = new ServiceCollection();
 
-            services.AddLogging(logging => logging.AddConsole()
-                .SetMinimumLevel(_verbose ? LogLevel.Trace : LogLevel.Information));
+            var dateSuffix = DateTime.Now.ToString("yyyy-MM-dd");
+
+            var logFile = Config.GetConfigFile($"{dateSuffix}.log");
+
+            services.AddLogging(logging => 
+                        logging
+                            .AddFileLogger(options => options.File = logFile)
+                            .SetMinimumLevel(LogLevel.Debug));
             
             services.AddHttpClient<OidcClient>(client => 
                     client.BaseAddress = new Uri("https://www.strava.com/oauth/token"))

@@ -60,7 +60,7 @@ namespace endoimport
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                    Process.Start("xdg-open", urlString);
+                    Process.Start("x-www-browser", urlString);
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
@@ -79,13 +79,13 @@ namespace endoimport
             }
         }
         
-        private static async Task<string> WaitForHttpResponseFromOidc(Uri callbackUrl, Uri redirectUrl)
+        private async Task<string> WaitForHttpResponseFromOidc(Uri callbackUrl, Uri redirectUrl)
         {
             using HttpListener listener = new HttpListener();
             listener.Prefixes.Add(callbackUrl + "/");
             listener.Start();
             
-            Console.WriteLine($"Awaiting login response on {callbackUrl}");
+            _logger.LogDebug($"Awaiting login response on {callbackUrl}");
 
             // Will wait here until we hear from a connection
             HttpListenerContext ctx = await listener.GetContextAsync();
