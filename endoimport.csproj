@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+    <RootNamespace>endoimport</RootNamespace>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>Link</TrimMode>
+    <DebugType>embedded</DebugType>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.2.*" />
+    <PackageReference Include="System.Net.Http.Json" Version="5.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="5.0.*" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="5.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="5.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="5.0.*" />
+    
+  </ItemGroup>
+
+</Project>
