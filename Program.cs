@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -23,16 +25,32 @@ namespace endomondo_importer
 
         static async Task<int> Main(string[] args)
         {
+            if (args.Length != 1)
+            {
+                PrintUsage(Environment.GetCommandLineArgs()[0]);
+                return 1;
+            }
+
+            var zipFile = args[0];
+            
             ServiceProvider = BuildServiceProvider();
             
             Console.WriteLine("Importing stuff...");
 
             var token = await GetToken();
             
-            var folder = GetFolder();
-            await ImportAllFilesIn(folder);
+            await ImportAllFilesIn(zipFile, token);
 
             return 0;
+        }
+
+        private static void PrintUsage(string programName)
+        {
+            Console.Out.WriteLine($@"
+Usage: {programName} <folder with export files from Endomondo>
+
+Example: {programName} ~/endomondo-export
+");
         }
 
         private static async Task<OidcResponse> GetToken()
@@ -51,32 +69,82 @@ namespace endomondo_importer
 
                 var now = DateTime.UtcNow;
                 var epochSeconds = (now - DateTime.UnixEpoch).TotalSeconds;
-
                 tokenIsValid = token?.expires_at > epochSeconds;
             }
 
             if (!tokenIsValid)
             {
-                var code = await GetCode();
-                token = await client.Login(code);
+                if (token?.refresh_token != null)
+                {
+                    token = await client.Refresh(token.refresh_token);
+                    await StoreToken(token, tokenFile);
+                }
+                else
+                {
+                    var code = await GetCode();
+                    token = await client.Login(code);
 
-                var text = JsonSerializer.Serialize(token, new JsonSerializerOptions() { WriteIndented = true});
-                await File.WriteAllTextAsync(tokenFile, text);
+                    await StoreToken(token, tokenFile);
+                }
             }
             
             return token;
         }
 
-        private static async Task ImportAllFilesIn(IEnumerable<FileInfo> folder)
+        private static async Task StoreToken(OidcResponse token, string tokenFile)
         {
-            await Task.CompletedTask;
-            throw new NotImplementedException();
+            var text = JsonSerializer.Serialize(token, new JsonSerializerOptions() {WriteIndented = true});
+            await File.WriteAllTextAsync(tokenFile, text);
         }
 
-        private static IEnumerable<FileInfo> GetFolder()
+        private static async Task ImportAllFilesIn(string file, OidcResponse token)
         {
-            throw new NotImplementedException();
+            const string Workouts = nameof(Workouts);
+
+            IList<string> jsonFiles = new List<string>();
+            IList<string> tcxFiles = new List<string>();
+            
+            using ZipArchive archive = ZipFile.OpenRead(file);
+            foreach (var entry in archive.Entries)
+            {
+                var fullName = entry.FullName;
+                var directoryName = Path.GetDirectoryName(fullName);
+                if (Workouts.Equals(directoryName, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    var lastDot = fullName.LastIndexOf('.');
+                    var stem = fullName.Substring(0, lastDot);
+                    var extension = fullName.Substring(lastDot);
+                    switch (extension)
+                    {
+                        case ".tcx":
+                            tcxFiles.Add(stem);
+                            break;
+                        case ".json":
+                            jsonFiles.Add(stem);
+                            break;
+                        default:
+                            throw new ApplicationException("Unknown file type: " + extension);
+                    }
+                }
+                
+                //await Console.Out.WriteLineAsync(directoryName);
+                //await Console.Out.WriteLineAsync(entry.Name);
+            }
+
+            var missingTcx = jsonFiles.Except(tcxFiles);
+            foreach (var stem in missingTcx)
+            {
+                Console.WriteLine($"Couldn't find TCX file for JSON file {stem}.json");
+            }
+
+            var missingJson = tcxFiles.Except(jsonFiles);
+            foreach (var stem in missingJson)
+            {
+                Console.WriteLine($"Couldn't find JSON file for TCX file {stem}.tcx");
+            }
+
         }
+
         
         private static ServiceProvider BuildServiceProvider()
         {
