@@ -127,8 +127,6 @@ Example: {programName} ~/endomondo-export
                     }
                 }
                 
-                //await Console.Out.WriteLineAsync(directoryName);
-                //await Console.Out.WriteLineAsync(entry.Name);
             }
 
             var missingTcx = jsonFiles.Except(tcxFiles);
@@ -141,6 +139,22 @@ Example: {programName} ~/endomondo-export
             foreach (var stem in missingJson)
             {
                 Console.WriteLine($"Couldn't find JSON file for TCX file {stem}.tcx");
+            }
+            
+            var api = ServiceProvider.GetRequiredService<StravaApi>(); 
+
+            for (var i = 0; i < 1; i++)
+            {
+                var stem = tcxFiles[i];
+                var entry = archive.GetEntry(stem + ".tcx");
+
+                await using var s = entry.Open();
+                var upload = new Activity()
+                {
+                    File = s
+                };
+
+                var res = await api.UploadActivity(upload, token.access_token);
             }
 
         }
@@ -157,11 +171,18 @@ Example: {programName} ~/endomondo-export
             services.AddLogging(logging => 
                         logging
                             .AddFileLogger(options => options.File = logFile)
-                            .SetMinimumLevel(LogLevel.Debug));
+                            .SetMinimumLevel(LogLevel.Trace));
             
             services.AddHttpClient<OidcClient>(client => 
                     client.BaseAddress = new Uri("https://www.strava.com/oauth/token"))
                         .AddPolicyHandler(GetRetryPolicy());
+
+            services.AddHttpClient<StravaApi>(client =>
+            {
+                client.BaseAddress = new Uri("https://www.strava.com/api/v3/");
+                client.Timeout = TimeSpan.FromMinutes(5);
+            });
+                        //.AddPolicyHandler(GetRetryPolicy());
 
             services.AddSingleton<UserAuthentication>();
             
